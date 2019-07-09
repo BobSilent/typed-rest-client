@@ -78,6 +78,7 @@ export function isHttps(requestUrl: string) {
 enum EnvironmentVariables {
     HTTP_PROXY = "HTTP_PROXY",
     HTTPS_PROXY = "HTTPS_PROXY",
+    NO_PROXY = "NO_PROXY",
 }
 
 export class HttpClient implements ifm.IHttpClient {
@@ -111,6 +112,13 @@ export class HttpClient implements ifm.IHttpClient {
                 this._ignoreSslError = requestOptions.ignoreSslError;
             }
 
+            let no_proxy: string = process.env[EnvironmentVariables.NO_PROXY];
+			if (no_proxy) {
+				this._httpProxyBypassHosts = [];
+				no_proxy.split(',').forEach(bypass => {
+					this._httpProxyBypassHosts.push(new RegExp(bypass, 'i'));
+				});
+			}
             this._socketTimeout = requestOptions.socketTimeout;
             this._httpProxy = requestOptions.proxy;
             if (requestOptions.proxy && requestOptions.proxy.proxyBypassHosts) {
@@ -126,15 +134,15 @@ export class HttpClient implements ifm.IHttpClient {
                 // If using cert, need fs
                 fs = require('fs');
 
-                // cache the cert content into memory, so we don't have to read it from disk every time 
+                // cache the cert content into memory, so we don't have to read it from disk every time
                 if (this._certConfig.caFile && fs.existsSync(this._certConfig.caFile)) {
                     this._ca = fs.readFileSync(this._certConfig.caFile, 'utf8');
                 }
-    
+
                 if (this._certConfig.certFile && fs.existsSync(this._certConfig.certFile)) {
                     this._cert = fs.readFileSync(this._certConfig.certFile, 'utf8');
                 }
-    
+
                 if (this._certConfig.keyFile && fs.existsSync(this._certConfig.keyFile)) {
                     this._key = fs.readFileSync(this._certConfig.keyFile, 'utf8');
                 }
@@ -227,7 +235,7 @@ export class HttpClient implements ifm.IHttpClient {
 
                 if (authenticationHandler) {
                     return authenticationHandler.handleAuthentication(this, info, data);
-                }  
+                }
                 else {
                     // We have received an unauthorized response but have no handlers to handle it.
                     // Let the response return to the caller.
@@ -279,14 +287,14 @@ export class HttpClient implements ifm.IHttpClient {
         if (this._agent) {
             this._agent.destroy();
         }
-        
+
         this._disposed = true;
     }
 
     /**
      * Raw request.
-     * @param info 
-     * @param data 
+     * @param info
+     * @param data
      */
     public requestRaw(info: ifm.IRequestInfo, data: string | NodeJS.ReadableStream): Promise<ifm.IHttpClientResponse> {
         return new Promise<ifm.IHttpClientResponse>((resolve, reject) => {
@@ -304,13 +312,13 @@ export class HttpClient implements ifm.IHttpClient {
 
     /**
      * Raw request with callback.
-     * @param info 
-     * @param data 
-     * @param onResult 
+     * @param info
+     * @param data
+     * @param onResult
      */
     public requestRawWithCallback(info: ifm.IRequestInfo, data: string | NodeJS.ReadableStream, onResult: (err: any, res: ifm.IHttpClientResponse) => void): void {
         let socket;
-        
+
         let isDataString = typeof (data) === 'string';
         if (typeof (data) === 'string') {
             info.options.headers["Content-Length"] = Buffer.byteLength(data, 'utf8');
@@ -550,5 +558,5 @@ export class HttpClient implements ifm.IHttpClient {
         retryNumber = Math.min(ExponentialBackoffCeiling, retryNumber);
         const ms: number = ExponentialBackoffTimeSlice*Math.pow(2, retryNumber);
         return new Promise(resolve => setTimeout(()=>resolve(), ms));
-    } 
+    }
 }
